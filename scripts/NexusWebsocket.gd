@@ -41,7 +41,7 @@ func is_room_server():
 
 func create_room(room_id:String="1234",room_pwd:String="") -> Error:
 	if conn_state!=ConnState.Offline:
-		log.emit("Cannot create, conn:state="+str(conn_state))
+		print("Cannot create, conn:state="+str(conn_state))
 		return ERR_CANT_CREATE
 	var msg = {
 		"room_id":room_id,
@@ -54,13 +54,12 @@ func create_room(room_id:String="1234",room_pwd:String="") -> Error:
 	var pk : PackedByteArray = PackedByteArray([0,0])
 	pk.append_array(JSON.stringify(msg).to_utf8_buffer())
 	on_connected_packet = pk
-	wsclient.connect_to_url("ws://"+lobby_url)
-	#wsclient.send(pk)
+	print(wsclient.connect_to_url("ws://"+lobby_url))
 	return OK
 
 func join_room(room_id:String="1234",room_pwd:String="") -> Error:
 	if conn_state!=ConnState.Offline:
-		log.emit("Cannot join, conn:state="+str(conn_state))
+		print("Cannot join, conn:state="+str(conn_state))
 		return ERR_CANT_CREATE
 	var msg = {
 		"room_id":room_id,
@@ -76,8 +75,8 @@ func join_room(room_id:String="1234",room_pwd:String="") -> Error:
 	pk.append(1) #Join room
 	pk.append_array(JSON.stringify(msg).to_utf8_buffer())
 	on_connected_packet = pk
-	wsclient.connect_to_url("ws://"+lobby_url)
-	#wsclient.send(pk)
+	print(wsclient.connect_to_url("ws://"+lobby_url))
+
 	return OK
 
 
@@ -102,6 +101,8 @@ func send_room_packet(bytes:PackedByteArray, dst:int,except_peer:int=255):
 
 func close_room():
 	wsclient.close()
+	conn_state = ConnState.Offline
+	room_state_changed.emit(conn_state)
 	return OK
 
 func set_join_status(status:bool):
@@ -119,21 +120,16 @@ func _poll():
 
 	var state = wsclient.get_ready_state()
 	if state!=old_state:
-		
+
 		old_state = state
 		var states = ["Connecting", "Connected", "Clossing", "Closed"]
 		print("NEW_SOCKET_STATE: " + states[state])
 		
-		if state == WebSocketPeer.STATE_OPEN:
-			
-			#conn_state = ConnState.NoRoom
-			#room_state_changed.emit(conn_state)			
+		if state == WebSocketPeer.STATE_OPEN:		
 			if on_connected_packet:
 				wsclient.send(on_connected_packet)
 				on_connected_packet = null
-				
 		elif state == WebSocketPeer.STATE_CLOSED:
-			
 			conn_state = ConnState.Offline
 			room_state_changed.emit(conn_state)
 			

@@ -14,8 +14,6 @@ signal room_state_changed(room_state)
 signal game_stage_changed(state)
 var game_stage : int = 0
 
-var spawner3d : Spawner3D
-
 var playerid : int = -1
 var playername : String = "Singleplayer"
 var _is_host : bool = false
@@ -51,7 +49,7 @@ func _enter_tree():
 			room_state_changed.emit(st)
 		)
 		tree_exiting.connect(func():
-			if nexus and is_online():
+			if nexus:
 				nexus.close_room()
 		)
 		_players = nexus._players.duplicate()
