@@ -31,7 +31,10 @@ class TcpConnection extends RefCounted:
 		packet_peer_stream.put_packet(bytes)
 
 	func get_status() -> StreamPeerTCP.Status:
-		return stream_peer_tcp.get_status()
+		if stream_peer_tcp:
+			return stream_peer_tcp.get_status()
+		else:
+			return StreamPeerTCP.Status.STATUS_NONE
 
 	func poll():
 		stream_peer_tcp.poll()
@@ -129,7 +132,9 @@ func _poll():
 				print(playername, " peer ", idx, " disconnected")
 				cli.packet_peer_stream.stream_peer = null
 				cli.stream_peer_tcp = null
+				player_msg.emit(idx,_players[idx], 0)
 				_peer_streams[idx] = null
+				_players.erase(idx)
 	else:
 		tcp_client.poll()
 		while tcp_client.get_available_packet_count()>0:
