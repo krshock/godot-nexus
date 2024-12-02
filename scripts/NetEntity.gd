@@ -5,7 +5,7 @@ class_name NetEntity
 @export var net_root : NetRoot
 var peer_id : int = -1
 var _disable_autoregister: bool = false
-var _disable_on_sync = true
+var _disable_on_sync = false
 var components : Dictionary = {}
 func _ready():
 	if Engine.is_editor_hint():
@@ -53,7 +53,6 @@ func set_sync_data(arr):
 	if name!=arr[1]:
 		name = arr[1]
 	peer_id = arr[2]
-	print(arr)
 
 func send_net_msg(peer_target:int, msgid:int, param, except_peer:int=255):
 	if net_root and net_root.is_online():

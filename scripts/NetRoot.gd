@@ -34,7 +34,7 @@ func _enter_tree():
 	log.connect(func(sss):
 		print(playername, " log: ", sss)
 	)
-	if nexus:
+	if nexus and nexus.peer_id!=-1:
 		_is_host = nexus.is_server
 		playerid = nexus.peer_id
 		playername = nexus.playername

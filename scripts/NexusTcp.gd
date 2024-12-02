@@ -267,7 +267,7 @@ func send_room_packet(bytes:PackedByteArray, target_peer:int,except:int=255):
 	elif !is_server and target_peer==0:
 		if tcp_client.get_status()==StreamPeerTCP.Status.STATUS_CONNECTED:
 			var pk = _build_room_packet(peer_id,target_peer,bytes)
-			print(playername, " client_pk=", pk)
+			#print(playername, " client_pk=", pk)
 			tcp_client.put_packet(pk)
 			return
 	print("Packet not sent, ori:", target_peer)
