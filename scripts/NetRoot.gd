@@ -14,6 +14,13 @@ signal room_state_changed(room_state)
 signal game_stage_changed(state)
 var game_stage : int = 0
 
+enum AutoWireType{
+	NONE,
+	WEBSOCKET,
+	TCP
+}
+@export var autowire_type : AutoWireType
+
 var playerid : int = -1
 var playername : String = "Singleplayer"
 var _is_host : bool = false
@@ -29,8 +36,10 @@ signal player_status(_id,_name,_status)
 var _initialized : bool = false
 func _enter_tree():
 	entities.resize(128)
-	if nexus==null:
-		nexus = MobNexus
+	if autowire_type==AutoWireType.WEBSOCKET:
+		nexus = NexusWS
+	elif autowire_type==AutoWireType.TCP:
+		nexus = NexusTCP	
 	log.connect(func(sss):
 		print(playername, " log: ", sss)
 	)

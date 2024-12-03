@@ -1,5 +1,6 @@
 extends Nexus
 
+class_name MobNexusTCP
 var tcp_server : TCPServer = TCPServer.new()
 var tcp_client : TcpConnection = TcpConnection.new(StreamPeerTCP.new())
 var tcp_psc : PacketPeerStream = PacketPeerStream.new()

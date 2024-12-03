@@ -1,6 +1,6 @@
 extends Nexus
 
-class_name NexusWebsocket
+class_name MobNexusWebsocket
 
 var wsclient : WebSocketPeer = WebSocketPeer.new()
 
