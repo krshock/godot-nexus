@@ -7,6 +7,7 @@ var peer_id : int = -1
 var _disable_autoregister: bool = false
 var _disable_on_sync = false
 var components : Dictionary = {}
+var _component_id : int = 0
 func _ready():
 	if Engine.is_editor_hint():
 		return
@@ -23,20 +24,16 @@ func _ready():
 	if !_disable_autoregister:
 		net_root.register_entity(self)
 		#print(name, " netid=", net_id)
-	var cid = 0
-	for ch in get_children():
-		if ch is NetComponent:
-			ch.nentity = self
-			ch.cid = cid
-			components[cid] = ch
-			cid += 1
-			
 
 func is_input_entity():
 	return net_root and net_root.input_entity == self
 	
 func is_host():
 	return net_root and net_root.is_host()
+
+func register_component(net_cmp:NetComponent):
+	net_cmp.cid = _component_id
+	_component_id += 1
 
 func logger(msg:String):
 	if net_root:
