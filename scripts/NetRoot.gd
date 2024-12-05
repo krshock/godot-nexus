@@ -115,9 +115,9 @@ func _on_room_data(ori_peer: int, bytes: PackedByteArray) -> bool:
 	#log.emit("Romm Data: source="+str(ori_peer))
 	#print(playername, " _on_room_data ", bytes)
 	if bytes[0]==NetMsg.EntityMsg: #Entity Msg
-		if bytes[1] >= entities.size() or !is_instance_valid(entities[bytes[1]]):
+		var ins = get_entity_by_id(bytes[1])
+		if ins==null:
 			return false
-		var ins = entities[bytes[1]]
 		var param_bytes : PackedByteArray = bytes.slice(3,bytes.size())
 		var param = null
 		if param_bytes.size()>0:
@@ -125,19 +125,14 @@ func _on_room_data(ori_peer: int, bytes: PackedByteArray) -> bool:
 		ins._recieve_packet(ori_peer, bytes[2], param)
 		return true
 	elif bytes[0]==NetMsg.ComponentMsg:
-		if bytes[1] >= entities.size() or !is_instance_valid(entities[bytes[1]]):
+		var ins : NetEntity = get_entity_by_id(bytes[1])
+		if ins==null:
 			return false
-		var ins : NetEntity = entities[bytes[1]]
-		var cid = bytes[2]
-		if !ins.components.has(cid) or is_instance_valid(ins.components[cid]):
-			return false
-		var nc : NetComponent = ins.components[cid]
-		var msgid = bytes[3]
 		var param_bytes : PackedByteArray = bytes.slice(4,bytes.size())
 		var param = null
 		if param_bytes.size()>0:
 			param = bytes_to_var(param_bytes)
-		nc._recieve_packet(ori_peer, msgid,param)
+		ins._recieve_component_packet(ori_peer, bytes[2],bytes[3], param)
 		return true
 	elif bytes[0]==NetMsg.DestroyEntity and !is_host():
 		destroy_entity(bytes[1])
@@ -164,7 +159,13 @@ func _send_sync_room_to_peer(peerid:int):
 		if is_instance_valid(entities[idx]):
 			var e = entities[idx]
 			cmd_spawn(str(get_path_to(e.get_parent())),e.scene_file_path, e.get_sync_data(),peerid)
-			
+
+func get_entity_by_id(net_id:int) -> NetEntity:
+	if net_id<0 or net_id>=entities.size():
+		return null
+	if !is_instance_valid(entities[net_id]):
+		return null
+	return entities[net_id]
 
 func set_game_stage(_game_stage):
 	game_stage = _game_stage
@@ -260,8 +261,8 @@ func send_entity_packet(peer_tgt:int,netid:int,msgid:int,bytes:PackedByteArray, 
 func send_component_packet(peer_tgt:int,netid:int,cid:int, msgid:int,bytes:PackedByteArray, except_peer:int=255):
 	if netid==-1: return		
 	if nexus and nexus.is_online() and peer_tgt!=playerid:
-		if except_peer!=255 and nexus._players.size()<=2:#dont repeat packet to the network
-			return
+		#if except_peer!=255 and nexus._players.size()<=2:#dont repeat packet to the network
+			#return
 		var pk = PackedByteArray([NetMsg.ComponentMsg,netid, cid, msgid])
 		if bytes.size()>0:
 			pk.append_array(bytes)
