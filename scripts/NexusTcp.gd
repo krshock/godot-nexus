@@ -43,6 +43,12 @@ class TcpConnection extends RefCounted:
 			_last_status = stream_peer_tcp.get_status()
 			if _last_status == StreamPeerTCP.Status.STATUS_CONNECTED:
 				connected.emit()
+	
+	func close():
+		if stream_peer_tcp:
+			packet_peer_stream.stream_peer = null
+			stream_peer_tcp.disconnect_from_host()
+			stream_peer_tcp = null
 
 func _ready():
 	tcp_client.connected.connect(func():
@@ -106,6 +112,13 @@ func join_room(room_id:String="1234",room_pwd:String="") -> Error:
 	return ERR_CANT_CONNECT
 
 
+func close_room():
+	tcp_server.stop()
+	for peer : TcpConnection in _peer_streams:
+		if peer==null:
+			continue
+		peer.close()
+
 func set_join_status(status:bool):
 	if is_server:
 		accepting_new_connections = status
@@ -131,8 +144,7 @@ func _poll():
 					_on_packet_in(pk, idx)
 			elif _status==StreamPeerTCP.Status.STATUS_NONE:
 				print(playername, " peer ", idx, " disconnected")
-				cli.packet_peer_stream.stream_peer = null
-				cli.stream_peer_tcp = null
+				cli.close()
 				player_msg.emit(idx,_players[idx], 0)
 				_peer_streams[idx] = null
 				_players.erase(idx)
