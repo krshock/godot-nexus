@@ -54,7 +54,9 @@ func create_room(room_id:String="1234",room_pwd:String="") -> Error:
 	var pk : PackedByteArray = PackedByteArray([0,0])
 	pk.append_array(JSON.stringify(msg).to_utf8_buffer())
 	on_connected_packet = pk
-	print(wsclient.connect_to_url("ws://"+lobby_url))
+	wsclient.connect_to_url("ws://"+lobby_url)
+	_check_ready_state_changed()
+	
 	return OK
 
 func join_room(room_id:String="1234",room_pwd:String="") -> Error:
@@ -75,7 +77,8 @@ func join_room(room_id:String="1234",room_pwd:String="") -> Error:
 	pk.append(1) #Join room
 	pk.append_array(JSON.stringify(msg).to_utf8_buffer())
 	on_connected_packet = pk
-	print(wsclient.connect_to_url("ws://"+lobby_url))
+	wsclient.connect_to_url("ws://"+lobby_url)
+	_check_ready_state_changed()
 
 	return OK
 
@@ -117,18 +120,22 @@ func _process(_delta):
 
 func _poll():
 	wsclient.poll()
+	_check_ready_state_changed()
 
+var _ws_states = ["Connecting", "Connected", "Clossing", "Closed"]
+func _check_ready_state_changed():
 	var state = wsclient.get_ready_state()
 	if state!=old_state:
-
 		old_state = state
-		var states = ["Connecting", "Connected", "Clossing", "Closed"]
-		print("NEW_SOCKET_STATE: " + states[state])
-		
+		print("NEW_SOCKET_STATE: " + _ws_states[state])
+
 		if state == WebSocketPeer.STATE_OPEN:		
 			if on_connected_packet:
 				wsclient.send(on_connected_packet)
 				on_connected_packet = null
+		if state ==  WebSocketPeer.STATE_CONNECTING:
+			conn_state = ConnState.RoomConnecting
+			room_state_changed.emit(conn_state)
 		elif state == WebSocketPeer.STATE_CLOSED:
 			conn_state = ConnState.Offline
 			room_state_changed.emit(conn_state)
