@@ -64,6 +64,19 @@ func send_net_msg(peer_target:int, msgid:int, param, except_peer:int=255):
 		var bytes = var_to_bytes(param)
 		net_root.send_entity_packet(peer_target,net_id,msgid,bytes, except_peer)
 
+func broadcast_net_msg(msgid:int, param, except_peer:int=255):
+	if net_root and net_root.is_online():
+		var peer_target : int = 255 if is_host() else 0
+		var bytes = var_to_bytes(param)
+		net_root.send_entity_packet(peer_target,net_id,msgid,bytes, except_peer)
+
+
+func send_component_msg(cid:int, msgid:int, param, except_peer=255):
+	if net_root and net_root.is_online():
+		var target_peer : int = 255 if is_host() else 0
+		var bytes = var_to_bytes(param)
+		net_root.send_component_packet(target_peer,net_id,cid,msgid,bytes,except_peer)
+
 func broadcast_component_msg(cid:int,msgid:int, param, except_peer:int=255):
 	if net_root and net_root.is_online():
 		var peer_target : int = 255 if is_host() else 0
