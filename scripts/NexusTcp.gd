@@ -79,18 +79,19 @@ func create_room(room_id:String="1234",room_pwd:String="") -> Error:
 		_players = {0: playername}
 		conn_state = ConnState.RoomConected
 		room_state_changed.emit(conn_state)
+		_room_secret = room_pwd
 		print("Room Created")
 		return OK
 	print("Cant Create Room")
 	return ERR_CANT_OPEN
 
-
+var _room_secret : String = ""
 func join_room(room_id:String="1234",room_pwd:String="") -> Error:
 	if OK==tcp_client.stream_peer_tcp.connect_to_host("127.0.0.1",7777):
 		is_server = false
 		peer_id = 1
 		_players = {}
-		
+		_room_secret = room_pwd
 		var msg = {
 		"room_id":room_id,
 		"room_pwd" : room_pwd,
@@ -113,11 +114,13 @@ func join_room(room_id:String="1234",room_pwd:String="") -> Error:
 
 
 func close_room():
-	tcp_server.stop()
-	for peer : TcpConnection in _peer_streams:
-		if peer==null:
-			continue
-		peer.close()
+	if is_server:
+		_room_secret = ""
+		tcp_server.stop()
+		for peer : TcpConnection in _peer_streams:
+			if peer==null:
+				continue
+			peer.close()
 
 func set_join_status(status:bool):
 	if is_server:
@@ -204,6 +207,12 @@ func _on_client_packet(pk:PackedByteArray):
 			return
 	print("lost packet: _on_client_packet, peer_id=",peer_id, " packet=", pk)
 
+func _close_client(peer_id:int):
+	var cli : TcpConnection = _peer_streams[peer_id]
+	if cli==null:
+		return
+	cli.close()
+	_peer_streams[peer_id] = null
 
 func _on_packet_in(pk:PackedByteArray, _peer_id:int):
 	if pk[0]==1 and pk[1]==0:
@@ -222,6 +231,14 @@ func _on_packet_in(pk:PackedByteArray, _peer_id:int):
 			if _appname!=json["app_name"]:
 				_send_packet_to(_build_msg_packet(2,0,"Incompatible Game"),_peer_id)
 				print("appname not supported:", json["app_name"])
+				await get_tree().create_timer(1).timeout
+				_close_client(_peer_id)
+				return
+			if _room_secret!=json["room_pwd"]:
+				_send_packet_to(_build_msg_packet(2,0,"Incorrect Password"),_peer_id)
+				print("wrong password:", json["room_pwd"])
+				await get_tree().create_timer(1).timeout
+				_close_client(_peer_id)
 				return
 			_send_packet_to(_build_msg_packet(0,0,"Ingresando a Room"),_peer_id)
 			_send_packet_to(_build_player_packet(_peer_id, json["player_name"], 1),255)
