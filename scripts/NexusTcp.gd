@@ -38,7 +38,10 @@ class TcpConnection extends RefCounted:
 			return StreamPeerTCP.Status.STATUS_NONE
 
 	func poll():
-		stream_peer_tcp.poll()
+		if stream_peer_tcp:
+			stream_peer_tcp.poll()
+		else:
+			return
 		if _last_status!=stream_peer_tcp.get_status():
 			_last_status = stream_peer_tcp.get_status()
 			if _last_status == StreamPeerTCP.Status.STATUS_CONNECTED:

@@ -7,6 +7,8 @@ class_name NetRoot
 const MAX_STATIC_NID = 20
 
 var entities : Array[NetEntity]= [] 
+var objects : Dictionary[int,NetObject] = {}
+var __object_id : int = 100
 
 signal log(msg)
 
@@ -27,7 +29,7 @@ var _is_host : bool = false
 var _is_online : bool = true
 var _players : Dictionary = {}
 
-var input_entity : NetEntity
+var input_entity
 
 
 
@@ -105,6 +107,7 @@ func _on_sync(entityid:int,data):
 enum NetMsg {
 	EnterRoom,
 	EntityMsg,
+	ObjectMsg,
 	EntitySync,
 	GamestateSet,
 	CmdSpawn,
@@ -123,6 +126,17 @@ func _on_room_data(ori_peer: int, bytes: PackedByteArray) -> bool:
 		if param_bytes.size()>0:
 			param = bytes_to_var(param_bytes)
 		ins._recieve_packet(ori_peer, bytes[2], param)
+		return true
+	elif bytes[0]==NetMsg.ObjectMsg: #Object Msg
+		var objid = bytes.decode_u16(1)
+		if !objects.has(objid):
+			return false
+		var ins = objects[objid]
+		var param_bytes : PackedByteArray = bytes.slice(4,bytes.size())
+		var param = null
+		if param_bytes.size()>0:
+			param = bytes_to_var(param_bytes)
+		ins._recieve_packet(ori_peer, bytes[3], param)
 		return true
 	elif bytes[0]==NetMsg.ComponentMsg:
 		var ins : NetEntity = get_entity_by_id(bytes[1])
@@ -177,6 +191,26 @@ func set_game_stage(_game_stage):
 func is_online():
 	return _is_online and nexus and nexus.conn_state == Nexus.ConnState.RoomConected
 
+
+func register_object(object:NetObject) -> bool:
+	pass
+	assert(object)
+	if object.obj_id!=-1:
+		assert(!objects.has(object.obj_id))
+	else:
+		var _id = __object_id
+		__object_id += 1
+		object.obj_id = _id
+	objects[object.obj_id]= object
+	object.tree_exiting.connect(func():
+		unregister_object(object)
+	)
+	return false
+
+func unregister_object(object:NetObject):
+	assert(objects.has(object.obj_id))
+	objects.erase(object.obj_id)
+	object.obj_id = -1
 
 ## Register a scene entity in the NetRoot repository
 func register_entity(entity:NetEntity) -> bool:
@@ -246,6 +280,16 @@ func is_host():
 	return _is_host
 
 
+## Networking functionality: send room packet to a client in the same room
+func send_object_packet(peer_tgt:int,objid:int,msgid:int,bytes:PackedByteArray, except_peer:int=255):
+	if objid==-1: return		
+	if nexus and nexus.is_online() and peer_tgt!=playerid:
+		var pk = PackedByteArray([NetMsg.ObjectMsg,0,0, msgid])
+		pk.encode_u16(1,objid)
+		if bytes.size()>0:
+			pk.append_array(bytes)
+		nexus.send_room_packet(pk,peer_tgt,except_peer)
+		
 ## Networking functionality: send room packet to a client in the same room
 func send_entity_packet(peer_tgt:int,netid:int,msgid:int,bytes:PackedByteArray, except_peer:int=255):
 	if netid==-1: return		
