@@ -51,6 +51,7 @@ func create_room(room_id:String="1234",room_pwd:String="") -> Error:
 	conn_state = ConnState.RoomConnecting
 	room_state_changed.emit(conn_state)
 	is_server = true
+	_players = {}
 	var pk : PackedByteArray = PackedByteArray([0,0])
 	pk.append_array(JSON.stringify(msg).to_utf8_buffer())
 	on_connected_packet = pk
@@ -71,7 +72,7 @@ func join_room(room_id:String="1234",room_pwd:String="") -> Error:
 	conn_state = ConnState.RoomConnecting
 	room_state_changed.emit(conn_state)
 	is_server = false
-	
+	_players = {}
 	var pk : PackedByteArray = PackedByteArray()
 	pk.append(0)
 	pk.append(1) #Join room

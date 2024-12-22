@@ -2,7 +2,7 @@ extends Node
 
 class_name Nexus
 
-@export var lobby_url : String = "localhost:7777/ws"
+@export var lobby_url : String = "localhost/nexus/ws"
 
 signal log(msg)
 signal room_data(_peerid, bytes)
