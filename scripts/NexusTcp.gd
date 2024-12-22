@@ -15,7 +15,11 @@ class TcpConnection extends RefCounted:
 	var packet_peer_stream : PacketPeerStream
 	var _last_status : StreamPeerTCP.Status
 	signal connected
-	
+	enum ProtocolStatus{
+		NONE,
+		CONNECTED
+	}
+	var protocol_status:ProtocolStatus
 	func _init(_stream_peer_tcp:StreamPeerTCP):
 		stream_peer_tcp = _stream_peer_tcp
 		packet_peer_stream = PacketPeerStream.new()
@@ -129,15 +133,32 @@ func set_join_status(status:bool):
 	if is_server:
 		accepting_new_connections = status
 
+
+## Waits for a second after the TCP connections was established to check if the protocol is in state Connected (or is just a random TCP connection that must be shut down)
+func _check_connection_corroutine(_peer_id:int):
+	await get_tree().create_timer(1.0).timeout
+	if _peer_streams[_peer_id].protocol_status!=TcpConnection.ProtocolStatus.CONNECTED:
+		_close_client(_peer_id)	
+
 func _poll():
 	if is_server:
 		if accepting_new_connections:
 			while tcp_server.is_connection_available():
 				var cli : StreamPeerTCP = tcp_server.take_connection()
 				var tcp_conn = TcpConnection.new(cli)
-				var _peer_id = _peer_streams.size()
-				_peer_streams.append(tcp_conn)
+				var _peer_id = -1
+				#Search for an unused slot...
+				for idx in range(1, _peer_streams.size()):
+					if _peer_streams[idx]==null:
+						_peer_id = idx
+						_peer_streams[_peer_id] = tcp_conn
+						break
+				#...else append to the array
+				if _peer_id==-1:
+					_peer_id = _peer_streams.size()
+					_peer_streams.append(tcp_conn)
 				print("TCP Connection Accepted: peer_id=", _peer_id)
+				_check_connection_corroutine(_peer_id)
 		for idx in range(1,_peer_streams.size()):
 			var cli : TcpConnection = _peer_streams[idx]
 			if cli==null:
@@ -151,7 +172,8 @@ func _poll():
 			elif _status==StreamPeerTCP.Status.STATUS_NONE:
 				print(playername, " peer ", idx, " disconnected")
 				cli.close()
-				player_msg.emit(idx,_players[idx], 0)
+				if _players.has(idx):
+					player_msg.emit(idx,_players[idx], 0)
 				_peer_streams[idx] = null
 				_players.erase(idx)
 	else:
@@ -243,6 +265,7 @@ func _on_packet_in(pk:PackedByteArray, _peer_id:int):
 				await get_tree().create_timer(1).timeout
 				_close_client(_peer_id)
 				return
+			_make_stream_connected(_peer_id)
 			_send_packet_to(_build_msg_packet(0,0,"Ingresando a Room"),_peer_id)
 			_send_packet_to(_build_player_packet(_peer_id, json["player_name"], 1),255)
 			for k in _players.keys():
@@ -252,9 +275,15 @@ func _on_packet_in(pk:PackedByteArray, _peer_id:int):
 			_players[_peer_id] = json["player_name"]
 			player_msg.emit(_peer_id,json["player_name"], 1)
 			print("player added: ", json["player_name"])
+				
 			return
 	print("unread packet: _on_packet_in, peer_id=",_peer_id, " packet=", pk)
+
+func _make_stream_connected(peer_id:int):
+	assert(_peer_streams[peer_id])
+	_peer_streams[peer_id].protocol_status = TcpConnection.ProtocolStatus.CONNECTED
 	
+
 func _send_packet_to(packet:PackedByteArray,target_peer:int, except:int=255):
 	if packet.size()==0:
 		print("Empty Packet")
@@ -292,6 +321,7 @@ func send_room_packet(bytes:PackedByteArray, target_peer:int,except:int=255):
 			for idx in range(1,_peer_streams.size()):
 				var conn : TcpConnection = _peer_streams[idx]
 				if conn == null or idx==except: continue
+				if conn.protocol_status!=TcpConnection.ProtocolStatus.CONNECTED: continue
 				if conn.get_status()==StreamPeerTCP.Status.STATUS_CONNECTED:
 					conn.put_packet(_build_room_packet(0,idx,bytes))
 			return
@@ -299,6 +329,7 @@ func send_room_packet(bytes:PackedByteArray, target_peer:int,except:int=255):
 			if target_peer>=1 and target_peer<_peer_streams.size():
 				var conn : TcpConnection = _peer_streams[target_peer]
 				if conn == null: return
+				if conn.protocol_status!=TcpConnection.ProtocolStatus.CONNECTED: return
 				if conn.get_status()==StreamPeerTCP.Status.STATUS_CONNECTED:
 					conn.put_packet(_build_room_packet(0,target_peer,bytes))
 					return
