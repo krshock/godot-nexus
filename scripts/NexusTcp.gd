@@ -168,7 +168,7 @@ func _poll():
 			if _status==StreamPeerTCP.Status.STATUS_CONNECTED:
 				while cli.get_available_packet_count()>0:
 					var pk = cli.get_packet()
-					_on_packet_in(pk, idx)
+					_on_packet_in(pk, idx, cli)
 			elif _status==StreamPeerTCP.Status.STATUS_NONE:
 				print(playername, " peer ", idx, " disconnected")
 				cli.close()
@@ -239,50 +239,52 @@ func _close_client(peer_id:int):
 	cli.close()
 	_peer_streams[peer_id] = null
 
-func _on_packet_in(pk:PackedByteArray, _peer_id:int):
-	if pk[0]==1 and pk[1]==0:
-		var ori = pk[2]
-		var dst = pk[3]
-		var bytes = pk.slice(4,pk.size())
-		room_data.emit(ori,bytes)
-		return
-	elif pk[0] == 0 and pk[1]==1 and pk.size()>5 and !_players.has(_peer_id):
-		var json_src = pk.slice(2,pk.size()).get_string_from_utf8()
-		var json = JSON.parse_string(json_src)
-		if json==null:
-			print("json didnt parse:")
-			print(json_src)
-		else:
-			if _appname!=json["app_name"]:
-				_send_packet_to(_build_msg_packet(2,0,"Incompatible Game"),_peer_id)
-				print("appname not supported:", json["app_name"])
-				await get_tree().create_timer(1).timeout
-				_close_client(_peer_id)
-				return
-			if _room_secret!=json["room_pwd"]:
-				_send_packet_to(_build_msg_packet(2,0,"Incorrect Password"),_peer_id)
-				print("wrong password:", json["room_pwd"])
-				await get_tree().create_timer(1).timeout
-				_close_client(_peer_id)
-				return
-			_make_stream_connected(_peer_id)
-			_send_packet_to(_build_msg_packet(0,0,"Ingresando a Room"),_peer_id)
-			_send_packet_to(_build_player_packet(_peer_id, json["player_name"], 1),255)
-			for k in _players.keys():
-				_send_packet_to(_build_player_packet(k,_players[k],1), _peer_id)
-			_send_packet_to(_build_player_packet(_peer_id, json["player_name"], 2),_peer_id)
-			_send_packet_to(_build_msg_packet(5,0,"Room ingresado"),_peer_id)
-			_players[_peer_id] = json["player_name"]
-			player_msg.emit(_peer_id,json["player_name"], 1)
-			print("player added: ", json["player_name"])
-				
+func _on_packet_in(pk:PackedByteArray, _peer_id:int, conn:TcpConnection):
+	if conn.protocol_status==TcpConnection.ProtocolStatus.CONNECTED:
+		if pk[0]==1 and pk[1]==0:
+			var ori = pk[2]
+			var dst = pk[3]
+			var bytes = pk.slice(4,pk.size())
+			room_data.emit(ori,bytes)
 			return
+	elif conn.protocol_status==TcpConnection.ProtocolStatus.NONE:
+		if pk[0] == 0 and pk[1]==1 and pk.size()>5 and !_players.has(_peer_id):
+			var json_src = pk.slice(2,pk.size()).get_string_from_utf8()
+			var json = JSON.parse_string(json_src)
+			if json==null:
+				print("json didnt parse:")
+				print(json_src)
+				return
+			else:
+				if _appname!=json["app_name"]:
+					_send_packet_to(_build_msg_packet(2,0,"Incompatible Game"),_peer_id)
+					print("appname not supported:", json["app_name"])
+					await get_tree().create_timer(1).timeout
+					_close_client(_peer_id)
+					return
+				if _room_secret!=json["room_pwd"]:
+					_send_packet_to(_build_msg_packet(2,0,"Incorrect Password"),_peer_id)
+					print("wrong password:", json["room_pwd"])
+					await get_tree().create_timer(1).timeout
+					_close_client(_peer_id)
+					return
+				
+				conn.protocol_status = TcpConnection.ProtocolStatus.CONNECTED
+				
+				_send_packet_to(_build_msg_packet(0,0,"Ingresando a Room"),_peer_id)
+				_send_packet_to(_build_player_packet(_peer_id, json["player_name"], 1),255)
+				for k in _players.keys():
+					_send_packet_to(_build_player_packet(k,_players[k],1), _peer_id)
+				_send_packet_to(_build_player_packet(_peer_id, json["player_name"], 2),_peer_id)
+				_send_packet_to(_build_msg_packet(5,0,"Room ingresado"),_peer_id)
+				_players[_peer_id] = json["player_name"]
+				player_msg.emit(_peer_id,json["player_name"], 1)
+				print("player added: ", json["player_name"])
+					
+				return
 	print("unread packet: _on_packet_in, peer_id=",_peer_id, " packet=", pk)
 
-func _make_stream_connected(peer_id:int):
-	assert(_peer_streams[peer_id])
-	_peer_streams[peer_id].protocol_status = TcpConnection.ProtocolStatus.CONNECTED
-	
+
 
 func _send_packet_to(packet:PackedByteArray,target_peer:int, except:int=255):
 	if packet.size()==0:
